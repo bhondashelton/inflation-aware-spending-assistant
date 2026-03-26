@@ -1,0 +1,64 @@
+name: Deploy to Streamlit Cloud
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11']
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pylint
+    
+    - name: Lint with pylint
+      run: pylint app.py --disable=all --enable=E,F
+      continue-on-error: true
+    
+    - name: Check requirements
+      run: |
+        pip check
+    
+    - name: Verify imports
+      run: |
+        python -c "import streamlit; import anthropic; import pandas; import numpy; import requests"
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Deploy to Streamlit Cloud
+      run: |
+        echo "✅ Deployment ready!"
+        echo "To deploy on Streamlit Cloud:"
+        echo "1. Go to https://share.streamlit.io"
+        echo "2. Click 'New app'"
+        echo "3. Select your GitHub repository"
+        echo "4. Set main file to 'app.py'"
+        echo "5. Add ANTHROPIC_API_KEY to secrets"
