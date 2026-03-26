@@ -2,9 +2,13 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-import requests
-from anthropic import Anthropic
 import json
+
+try:
+    from anthropic import Anthropic
+except ImportError as e:
+    st.error(f"Error importing Anthropic: {str(e)}")
+    st.stop()
 
 # Initialize Streamlit page config
 st.set_page_config(
@@ -14,8 +18,31 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Get API key from secrets or user input
+api_key = None
+try:
+    if "ANTHROPIC_API_KEY" in st.secrets:
+        api_key = st.secrets["ANTHROPIC_API_KEY"]
+except Exception:
+    pass
+
+if not api_key:
+    api_key = st.text_input(
+        "Enter your Anthropic API Key",
+        type="password",
+        help="Get your API key from https://console.anthropic.com"
+    )
+
+if not api_key:
+    st.warning("⚠️ Please enter your Anthropic API key to continue")
+    st.stop()
+
 # Initialize Anthropic client
-client = Anthropic()
+try:
+    client = Anthropic(api_key=api_key)
+except Exception as e:
+    st.error(f"Failed to initialize Anthropic client: {str(e)}")
+    st.stop()
 
 # Session state for conversation history
 if "messages" not in st.session_state:
@@ -33,20 +60,7 @@ Get personalized recommendations to maintain purchasing power in an inflationary
 # Sidebar for configuration
 with st.sidebar:
     st.header("⚙️ Settings")
-    
-    # API Key input
-    api_key = st.text_input(
-        "Enter your Anthropic API Key",
-        type="password",
-        help="Get your API key from https://console.anthropic.com"
-    )
-    
-    if not api_key:
-        st.warning("Please enter your Anthropic API key to use this application.")
-        st.stop()
-    
-    # Update client with API key
-    client = Anthropic(api_key=api_key)
+    st.success("✅ API key configured" if api_key else "❌ No API key")
     
     st.divider()
     st.subheader("Budget Setup")
@@ -145,7 +159,7 @@ def chat_with_agent(user_message, budget_data, inflation_data, categories):
     })
     
     try:
-        # Call Anthropic API
+        # Call Anthropic API using Claude 3.5 Sonnet
         response = client.messages.create(
             model="claude-3-5-sonnet-20241022",
             max_tokens=1024,
@@ -161,7 +175,10 @@ def chat_with_agent(user_message, budget_data, inflation_data, categories):
         
         return assistant_message
     except Exception as e:
-        st.error(f"Error communicating with AI agent: {str(e)}")
+        error_str = str(e)
+        st.error(f"❌ Error: {error_str}")
+        if "invalid_request_error" in error_str.lower() or "model" in error_str.lower():
+            st.info("💡 The model may not be available. Try using 'claude-3-sonnet-20240229' instead.")
         return None
 
 
@@ -281,7 +298,8 @@ if user_input:
         "categories": category_budgets if categories else {}
     }
     
-    response = chat_with_agent(user_input, budget_data, inflation_data, categories)
+    with st.spinner("🤔 Thinking..."):
+        response = chat_with_agent(user_input, budget_data, inflation_data, categories)
     
     if response:
         st.rerun()
