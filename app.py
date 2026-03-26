@@ -3,11 +3,23 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import json
+import sys
 
+# Try importing anthropic with fallback
 try:
     from anthropic import Anthropic
-except ImportError as e:
-    st.error(f"Error importing Anthropic: {str(e)}")
+except ImportError:
+    st.error("""
+    ❌ **Anthropic library not installed**
+    
+    Streamlit Cloud is still installing dependencies. 
+    Please wait 1-2 minutes and refresh the page.
+    
+    If this persists, try:
+    1. Click "Settings" → "Secrets" in Streamlit
+    2. Add your ANTHROPIC_API_KEY
+    3. Go back and refresh
+    """)
     st.stop()
 
 # Initialize Streamlit page config
